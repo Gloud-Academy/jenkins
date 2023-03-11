@@ -1,45 +1,30 @@
-import hudson.model.*
-import jenkins.*
-import groovy.text.*
-
-// Define report file path and email recipients
-def reportPath = "E:/local-server/jenkins/report.html"
-def recipients = ["harish_raj@gove.co"]
-
-// Retrieve list of jobs
-def jobs = Jenkins.instance.getAllItems(Job.class)
-
-// Loop through jobs and generate HTML report
-def reports = jobs.collect { job ->
+def html = '<html><head><title>Pipeline Status Report</title></head><body>'
+def jobs = Jenkins.instance.getAllItems(AbstractProject.class)
+jobs.each { job ->
+  if (job.class.canonicalName == "org.jenkinsci.plugins.workflow.job.WorkflowJob") {
     def lastBuild = job.getLastBuild()
-    def builds = []
+    html += "<h1>${job.displayName}</h1><table><tr><th>Build Number</th><th>Status</th><th>Duration</th></tr>"
     while (lastBuild != null) {
-        builds << [
-            number: lastBuild.getNumber(),
-            result: lastBuild.getResult().toString(),
-            timestamp: new Date(lastBuild.getStartTimeInMillis()),
-            duration: lastBuild.getDurationString()
-        ]
-        lastBuild = lastBuild.getPreviousBuild()
+      def number = lastBuild.getNumber()
+      def result = lastBuild.getResult().toString()
+      def duration = lastBuild.getDurationString()
+      html += "<tr><td><a href='${job.getUrl()}${number}'>#${number}</a></td><td>${result}</td><td>${duration}</td></tr>"
+      lastBuild = lastBuild.getPreviousBuild()
     }
-    [jobName: job.getName(), report: template.toString()]
+    html += "</table>"
+  }
 }
+html += '</body></html>'
+def reportFile = new File("${JENKINS_HOME}/report.html")
+reportFile.write(html)
+emailReport(reportFile)
 
-// Combine all reports into a single file
-def reportFile = new File(reportPath)
-reportFile.withWriter { writer ->
-    writer.write('<html><head><title>Jenkins Build Report</title></head><body>')
-    reports.each { report ->
-        writer.write('<h1>' + report.jobName + '</h1>')
-        writer.write(report.report)
-    }
-    writer.write('</body></html>')
+void emailReport(File reportFile) {
+  emailext (
+    to: 'harish_raj@gove.co',
+    subject: 'Pipeline Status Report',
+    body: 'Please find attached the daily pipeline status report.',
+    attachLog: true,
+    attachmentsPattern: "${reportFile.getAbsolutePath()}"
+  )
 }
-
-// Send report via email
-Jenkins.instance.sendMail(
-    subject: 'Jenkins Build Report - ' + new Date().format('MM/dd/yyyy'),
-    body: reportFile.text,
-    mimeType: 'text/html',
-    to: recipients.join(",")
-)
