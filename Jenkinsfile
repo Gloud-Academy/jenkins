@@ -3,7 +3,7 @@ import jenkins.*
 import groovy.text.*
 
 // Define report file path and email recipients
-def reportPath = "E:\local-server\jenkins\report.html"
+def reportPath = "E:/local-server/jenkins/report.html"
 def recipients = ["harish_raj@gove.co"]
 
 // Retrieve list of jobs
